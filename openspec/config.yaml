@@ -1,0 +1,7 @@
+schema: spec-driven
+context: |
+  Project Broadside: unclassified fictional naval-themed game and agentic SDD demonstrator.
+  TypeScript/Vite/Three.js frontend; Node Express server; GunDB for realtime public match notifications.
+  Matchmaking and game-rule authority are server-side. Never place private fleet locations or session tokens in Gun.
+  Keep domain game logic independent of HTTP, persistence, and Three.js rendering.
+  Require tests for match lifecycle, invalid shots, turn enforcement, and secrecy.

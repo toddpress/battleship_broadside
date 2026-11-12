@@ -1,0 +1,358 @@
+@import url("https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600&display=swap");
+:root {
+  font-family: Manrope, system-ui, sans-serif;
+  color: #f2f1e9;
+  background: #071725;
+  font-synthesis: none;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  overflow: hidden;
+}
+#scene {
+  position: fixed;
+  inset: 0;
+}
+#scene canvas {
+  display: block;
+}
+.grain {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(3, 16, 25, 0.94) 0%,
+    rgba(3, 16, 25, 0.77) 31%,
+    rgba(3, 16, 25, 0.22) 70%,
+    rgba(3, 16, 25, 0.2) 100%
+  );
+}
+header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 92px;
+  border-bottom: 1px solid #ffffff20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 5vw;
+  z-index: 2;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+.insignia {
+  font-size: 34px;
+  color: #d9b977;
+}
+.brand strong {
+  display: block;
+  font:
+    800 28px "Barlow Condensed",
+    sans-serif;
+  letter-spacing: 0.18em;
+  line-height: 1;
+}
+.brand small {
+  display: block;
+  color: #8babb5;
+  font:
+    10px "DM Mono",
+    monospace;
+  letter-spacing: 0.15em;
+  margin-top: 8px;
+}
+.status,
+.eyebrow,
+.minor,
+.pulse,
+.fleet-heading,
+.targetline,
+footer {
+  font:
+    11px "DM Mono",
+    monospace;
+  letter-spacing: 0.14em;
+}
+.status {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  color: #a1bac1;
+}
+#netdot,
+.pulse i {
+  height: 8px;
+  width: 8px;
+  border-radius: 50%;
+  background: #bd9360;
+  display: inline-block;
+}
+#netdot.connected,
+.pulse i {
+  background: #70c5ae;
+  box-shadow: 0 0 12px #70c5ae;
+}
+main {
+  position: fixed;
+  z-index: 1;
+  left: 5vw;
+  top: 50%;
+  transform: translateY(-43%);
+  width: min(500px, 90vw);
+}
+.eyebrow {
+  color: #d9b977;
+  letter-spacing: 0.18em;
+}
+h1 {
+  font:
+    800 clamp(62px, 7vw, 108px)/0.84 "Barlow Condensed",
+    sans-serif;
+  letter-spacing: 0.01em;
+  margin: 32px 0 27px;
+}
+h1 em {
+  font-style: normal;
+  color: #d9b977;
+}
+p {
+  color: #b5c4c8;
+  line-height: 1.75;
+  font-size: 14px;
+  max-width: 390px;
+  margin: 0 0 28px;
+}
+button {
+  font:
+    700 14px "Barlow Condensed",
+    sans-serif;
+  letter-spacing: 0.15em;
+  color: #061724;
+  background: #d9b977;
+  border: 0;
+  padding: 19px 24px;
+  min-width: 275px;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+button:hover:not(:disabled) {
+  background: #f1d399;
+}
+button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+button span {
+  font-size: 19px;
+}
+.minor {
+  color: #778f98;
+  font-size: 9px;
+  margin-top: 18px;
+}
+.gamebox {
+  background: #071a27eb;
+  border: 1px solid #6c92a03b;
+  padding: 30px;
+  box-shadow: 0 18px 65px #0006;
+  max-width: 460px;
+}
+.gamebox h2 {
+  font:
+    800 38px/1 "Barlow Condensed",
+    sans-serif;
+  letter-spacing: 0.05em;
+  margin: 15px 0;
+}
+.gamebox p {
+  font-size: 12px;
+  margin-bottom: 18px;
+}
+.gamebox button {
+  width: 100%;
+  min-width: 0;
+}
+.radar {
+  border: 1px solid #5f8b9959;
+  border-radius: 50%;
+  height: 146px;
+  width: 146px;
+  margin: 25px auto;
+  display: grid;
+  place-items: center;
+  position: relative;
+  overflow: hidden;
+  background: repeating-radial-gradient(
+    circle,
+    #123a48 0px,
+    #123a48 1px,
+    #071e2c 2px,
+    #071e2c 29px
+  );
+}
+.radar span {
+  font-size: 26px;
+  color: #c4d0cb;
+}
+.radar-beam {
+  position: absolute;
+  width: 50%;
+  height: 50%;
+  top: 0;
+  left: 50%;
+  transform-origin: bottom left;
+  background: linear-gradient(45deg, #70c5ae52, transparent);
+  animation: sweep 3s linear infinite;
+}
+@keyframes sweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.waiting {
+  text-align: center;
+}
+.waiting p {
+  margin-left: auto;
+  margin-right: auto;
+}
+.pulse {
+  color: #70c5ae;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 28px;
+  font-size: 9px;
+}
+.waiting button {
+  background: transparent;
+  color: #b9c5c9;
+  border: 1px solid #4c7785;
+  justify-content: center;
+}
+.scoreboard {
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid #416071;
+  border-bottom: 1px solid #416071;
+  padding: 12px 0;
+  margin-bottom: 20px;
+}
+.scoreboard strong {
+  display: block;
+  font:
+    700 27px "Barlow Condensed",
+    sans-serif;
+}
+.scoreboard span {
+  display: block;
+  color: #8da6b2;
+  font:
+    9px "DM Mono",
+    monospace;
+}
+.fleet-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  margin-bottom: 10px;
+}
+.fleet-heading span {
+  font-size: 8px;
+  color: #8099a1;
+}
+.mini-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 3px;
+  max-width: 300px;
+  margin: 0 auto 16px;
+}
+.mini-cell {
+  aspect-ratio: 1;
+  background: #164253;
+  border: 1px solid #ffffff17;
+}
+.mini-cell.ship {
+  background: #77969d;
+}
+.mini-cell.miss {
+  background: #3d6573;
+  position: relative;
+}
+.mini-cell.miss:after {
+  content: "·";
+  position: absolute;
+  inset: 0;
+  text-align: center;
+  color: white;
+}
+.mini-cell.damage {
+  background: #db715e;
+}
+.targetline {
+  font-size: 10px;
+  color: #d9b977;
+  margin-bottom: 12px;
+}
+.error {
+  color: #f3a698;
+}
+footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 24px 5vw;
+  border-top: 1px solid #ffffff18;
+  display: flex;
+  justify-content: space-between;
+  color: #7d9ba5;
+  font-size: 9px;
+  z-index: 2;
+}
+@media (max-width: 700px) {
+  header {
+    height: 75px;
+  }
+  .brand strong {
+    font-size: 23px;
+  }
+  .status {
+    font-size: 9px;
+  }
+  main {
+    top: 51%;
+    transform: translateY(-50%);
+  }
+  h1 {
+    font-size: 65px;
+  }
+  .grain {
+    background: linear-gradient(90deg, #031019ed, #0310198a);
+  }
+  .gamebox {
+    padding: 20px;
+  }
+  .gamebox h2 {
+    font-size: 28px;
+  }
+  footer {
+    font-size: 8px;
+    gap: 8px;
+  }
+}

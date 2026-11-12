@@ -1,0 +1,6 @@
+{
+  "name": "project-broadside", "version": "0.1.0", "private": true, "type": "module",
+  "scripts": {"dev":"concurrently -k \"npm:server\" \"npm:client\"", "server":"node server/index.js", "client":"vite --host 0.0.0.0", "build":"tsc --noEmit && vite build", "test":"node --test tests/*.test.js", "check":"npm run test && npm run build"},
+  "dependencies": {"express":"^4.21.2", "gun":"^0.2020.1241", "three":"^0.180.0"},
+  "devDependencies": {"@types/express":"^4.17.21", "@types/node":"^22.15.0", "@types/three":"^0.180.0", "concurrently":"^9.1.2", "typescript":"^5.8.3", "vite":"^6.3.5"}
+}

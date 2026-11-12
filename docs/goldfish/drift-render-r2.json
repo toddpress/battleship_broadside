@@ -1,0 +1,56 @@
+{
+  "gate": "drift",
+  "model": "gpt-oss:20b",
+  "reviewedAt": "2026-11-12T01:04:04.642328Z",
+  "inputs": [
+    {
+      "path": "openspec/changes/render-orthographic-battlefield/specs/visualization/spec.md",
+      "sha256": "780a95912f635c298f77a41820f1a5048c0de3351789187b8f75cd4d44867323"
+    },
+    {
+      "path": "src/battlefield.ts",
+      "sha256": "a8221bf919285a40ee26f06e3f6a222c91ffc17210b6cfdb913196cef6935394"
+    },
+    {
+      "path": "docs/goldfish/DRIFT.md",
+      "sha256": "7f81d7e3bf301d0d23081c03d95303cdb86826d2c6e05d4def3d5113dc4d4595"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "high",
+      "anchor": "Requirement: Interactive naval battlefield",
+      "issue": "Camera movement may alter board coordinates due to orbit constraints not guaranteeing orthographic stability",
+      "impact": "User may select wrong tile after zoom/rotate",
+      "recommendation": "Add explicit coordinate lock or recalc on camera change to maintain stable board coordinates"
+    },
+    {
+      "severity": "medium",
+      "anchor": "Requirement: Combat effects and frame budget",
+      "issue": "Frame budget metrics rely on a single Mac reference; no cross-platform validation",
+      "impact": "Performance may exceed limits on other hardware",
+      "recommendation": "Specify minimum hardware or provide adaptive quality thresholds"
+    },
+    {
+      "severity": "low",
+      "anchor": "src/battlefield.ts",
+      "issue": "`dispose()` calls `renderer.forceContextLoss()` after disposing resources, which may leave dangling GPU resources if called multiple times",
+      "impact": "Potential memory leak in long-running sessions",
+      "recommendation": "Guard against double disposal or remove redundant forceContextLoss"
+    },
+    {
+      "severity": "medium",
+      "anchor": "src/battlefield.ts",
+      "issue": "`motion.matches` is used to skip animations but not to cancel ongoing ones when preference changes mid-animation",
+      "impact": "Visual glitches if user toggles reduced motion",
+      "recommendation": "Add listener to `prefers-reduced-motion` media query and cancel current animation on change"
+    },
+    {
+      "severity": "low",
+      "anchor": "docs/goldfish/DRIFT.md",
+      "issue": "Section 2 lists \"Declined\" for particle capacities but code still uses fixed counts; mismatch between spec and implementation",
+      "impact": "Documentation inconsistency may mislead reviewers",
+      "recommendation": "Update DRIFT.md to reflect current particle handling or adjust code to match spec"
+    }
+  ]
+}

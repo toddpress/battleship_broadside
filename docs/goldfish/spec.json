@@ -1,0 +1,86 @@
+{
+  "gate": "spec",
+  "model": "gpt-oss:20b",
+  "reviewedAt": "2026-11-12T00:26:58.482564Z",
+  "inputs": [
+    {
+      "path": "docs/BROADSIDE-CHECKPOINT.md",
+      "sha256": "66939cd72d8350cfdbe62f9c0efaecda712c208c0ce709c2b52240f81312d3a6"
+    },
+    {
+      "path": "openspec/changes/complete-fleet-and-combat/specs/gameplay/spec.md",
+      "sha256": "5425a51d3d8daaba88430d64b4b15128bd266efb8a0f48a109ca2c1232677c63"
+    },
+    {
+      "path": "openspec/changes/establish-authoritative-core/specs/server-authority/spec.md",
+      "sha256": "54a06eb5d51aa19cc82ae0799ce378b7f6aefad7330c854f602875ce9c50f960"
+    },
+    {
+      "path": "openspec/changes/finish-match-experience/specs/room-experience/spec.md",
+      "sha256": "fbf785525c97cb7438ef52f31ee2add14fabae8dc274849fdec95d600571a56d"
+    },
+    {
+      "path": "openspec/changes/pair-and-recover-rooms/specs/matchmaking/spec.md",
+      "sha256": "37e1a71fdc567d4537635ea270f289a462e47e79b64c96b167977b5c8befee05"
+    },
+    {
+      "path": "openspec/changes/render-orthographic-battlefield/specs/visualization/spec.md",
+      "sha256": "780a95912f635c298f77a41820f1a5048c0de3351789187b8f75cd4d44867323"
+    },
+    {
+      "path": "openspec/changes/verify-and-demonstrate-sdd/specs/sdd-verification/spec.md",
+      "sha256": "fd29d7392382602ee04c8ab04dc66cd3d8e0b0b8195bdb5a3674651648aaeb45"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "high",
+      "anchor": "docs/BROADSIDE-CHECKPOINT.md",
+      "issue": "Missing explicit definition of the 10‑second heartbeat interval and 30‑second pause rule in the contract diagram",
+      "impact": "Clients may mis‑implement reconnection logic, leading to premature seat forfeiture or stale state exposure.",
+      "recommendation": "Add a dedicated section in the sequence diagram or a separate timing table that documents the exact heartbeat, pause, and expiry intervals, and reference it in the implementation notes."
+    },
+    {
+      "severity": "medium",
+      "anchor": "openspec/changes/complete-fleet-and-combat/specs/gameplay/spec.md",
+      "issue": "Scenario for 'Fleet secrecy verified' incorrectly states that the server rejects ready when a draft overlaps, but the requirement says the server should reject the ready *without publishing fleet cells or advancing phase* – the wording is ambiguous.",
+      "impact": "Test harnesses may incorrectly interpret the failure condition, causing false positives.",
+      "recommendation": "Clarify the scenario to explicitly state that the server must reject the ready command and that the phase remains unchanged, and update the test to assert no phase transition."
+    },
+    {
+      "severity": "medium",
+      "anchor": "openspec/changes/establish-authoritative-core/specs/server-authority/spec.md",
+      "issue": "Requirement for 'Command serialization' mentions a bounded per‑seat receipt but does not specify the maximum number of pending receipts or the cleanup policy.",
+      "impact": "Potential memory growth if a client repeatedly sends duplicate commands before the server responds.",
+      "recommendation": "Define a maximum receipt window (e.g., 100 pending) and a TTL for stored receipts, and document the cleanup strategy."
+    },
+    {
+      "severity": "low",
+      "anchor": "openspec/changes/finish-match-experience/specs/room-experience/spec.md",
+      "issue": "The 'Rematch and visible connection state' requirement references 'HUD' but the UI spec does not define the HUD component hierarchy.",
+      "impact": "UI developers may implement an inconsistent HUD, leading to user confusion.",
+      "recommendation": "Add a visual diagram of the HUD layout and a list of state variables it must display."
+    },
+    {
+      "severity": "medium",
+      "anchor": "openspec/changes/pair-and-recover-rooms/specs/matchmaking/spec.md",
+      "issue": "The 'Expiration and departure' requirement states that an expired combat seat forfeits only if the other seat is present, but the scenario for 'One expired combat seat' does not cover the case where the other seat is absent.",
+      "impact": "Ambiguity may lead to inconsistent forfeit handling when both seats expire simultaneously.",
+      "recommendation": "Add a scenario covering simultaneous expiry and define the outcome (e.g., both seats forfeited, room closed)."
+    },
+    {
+      "severity": "high",
+      "anchor": "openspec/changes/render-orthographic-battlefield/specs/visualization/spec.md",
+      "issue": "The frame budget requirement specifies a median frame time of 16.7 ms and a p95 of 25 ms, but the test harness only records average times.",
+      "impact": "Performance regressions may go unnoticed if only averages are checked.",
+      "recommendation": "Update the benchmark script to capture per‑frame timestamps and compute median and p95 metrics, and enforce them in CI."
+    },
+    {
+      "severity": "medium",
+      "anchor": "openspec/changes/verify-and-demonstrate-sdd/specs/sdd-verification/spec.md",
+      "issue": "The 'Independent review gates' requirement mentions that Ollama receives only the files and rubric, but the spec does not define the exact file list or the hashing algorithm.",
+      "impact": "Reviewers may inadvertently include extraneous files, compromising the statelessness guarantee.",
+      "recommendation": "Provide a manifest of required artifacts and specify the SHA‑256 hashing algorithm to be used for evidence anchors."
+    }
+  ]
+}

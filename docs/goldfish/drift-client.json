@@ -1,0 +1,110 @@
+{
+  "gate": "drift",
+  "model": "gpt-oss:20b",
+  "reviewedAt": "2026-11-12T00:59:07.851422Z",
+  "inputs": [
+    {
+      "path": "openspec/changes/render-orthographic-battlefield/specs/visualization/spec.md",
+      "sha256": "780a95912f635c298f77a41820f1a5048c0de3351789187b8f75cd4d44867323"
+    },
+    {
+      "path": "openspec/changes/finish-match-experience/specs/room-experience/spec.md",
+      "sha256": "fbf785525c97cb7438ef52f31ee2add14fabae8dc274849fdec95d600571a56d"
+    },
+    {
+      "path": "src/battlefield.ts",
+      "sha256": "2a58f5a42ff149073c5f2eaa54e1c34e013f41cf4083c1f3ec047f31099e9d68"
+    },
+    {
+      "path": "src/vessels.ts",
+      "sha256": "4f214c33643f217814f27ffedcad791d2921043b007fa591c0db3057777fe02e"
+    },
+    {
+      "path": "src/session.ts",
+      "sha256": "0c4dd4d17ca98e65bd1fb3504701b44be3a83c14e751f90f737ec54755cae5fa"
+    },
+    {
+      "path": "src/main.ts",
+      "sha256": "aa67a23923df98f89a1747fecd86fa89bd0f80540d3e608994409be245a86802"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "high",
+      "anchor": "src/battlefield.ts",
+      "issue": "Missing GPU resource disposal for dynamic meshes",
+      "impact": "Memory leak and potential GPU exhaustion on long sessions or frequent scene reloads.",
+      "recommendation": "Track and dispose all InstancedMesh instances (tiles, marks, effects) when Battlefield is disposed. Add a cleanup loop that calls mesh.dispose() for each batch."
+    },
+    {
+      "severity": "medium",
+      "anchor": "src/battlefield.ts",
+      "issue": "Hard‑coded particle count and duration limits",
+      "impact": "Violates requirement to cap particle and scene counts; may exceed 150k triangles on high‑end hardware.",
+      "recommendation": "Expose particle count and triangle budget as configurable parameters and enforce them in animateShot and batch creation."
+    },
+    {
+      "severity": "medium",
+      "anchor": "src/battlefield.ts",
+      "issue": "No explicit handling of reduced motion preference during particle animation",
+      "impact": "Particles may still animate when prefers‑reduced‑motion is set, conflicting with requirement to reduce motion on request.",
+      "recommendation": "Guard particle emission and shell animation with `this.motion.matches` and skip or simplify when true."
+    },
+    {
+      "severity": "medium",
+      "anchor": "src/battlefield.ts",
+      "issue": "Camera movement logic does not clamp target to board bounds",
+      "impact": "Camera could drift outside intended view, breaking orthographic stability requirement.",
+      "recommendation": "Clamp `viewGoal` and `positionGoal` to the board extents before lerping."
+    },
+    {
+      "severity": "medium",
+      "anchor": "src/battlefield.ts",
+      "issue": "No observable metrics for frame budget in production",
+      "impact": "Cannot verify compliance with 16.7 ms median frame time requirement.",
+      "recommendation": "Expose metrics via a global object or a dedicated API endpoint; log or send to analytics."
+    },
+    {
+      "severity": "medium",
+      "anchor": "src/session.ts",
+      "issue": "Retry logic uses a single timeout without exponential back‑off",
+      "impact": "May overload server during network outages and violate graceful degradation.",
+      "recommendation": "Implement exponential back‑off with jitter for `retry` and `offline` reconnection attempts."
+    },
+    {
+      "severity": "medium",
+      "anchor": "src/session.ts",
+      "issue": "Session token stored in sessionStorage without expiration handling",
+      "impact": "Stale tokens may be reused after server revocation, causing authentication errors.",
+      "recommendation": "Store token with an expiry timestamp and clear it when expired or on `clear`."
+    },
+    {
+      "severity": "medium",
+      "anchor": "src/main.ts",
+      "issue": "Chat input maxlength set to 480 but error message limits to 240 characters",
+      "impact": "User can type up to 480 characters, but server rejects >240, leading to confusion.",
+      "recommendation": "Align UI maxlength with server limit (240) and update error message accordingly."
+    },
+    {
+      "severity": "medium",
+      "anchor": "src/main.ts",
+      "issue": "No sanitization of chat messages before rendering",
+      "impact": "Potential XSS if server accepts markup-like text.",
+      "recommendation": "Escape message text before inserting into DOM or use textContent only."
+    },
+    {
+      "severity": "medium",
+      "anchor": "src/main.ts",
+      "issue": "Hard‑coded seat index assumption (0/1) without validation",
+      "impact": "If server changes seat numbering, UI logic may break.",
+      "recommendation": "Derive seat index from state and validate against expected values."
+    },
+    {
+      "severity": "low",
+      "anchor": "src/main.ts",
+      "issue": "Missing accessibility attribute for chat form submit button",
+      "impact": "Screen readers may not announce the button purpose.",
+      "recommendation": "Add `aria-label="
+    }
+  ]
+}

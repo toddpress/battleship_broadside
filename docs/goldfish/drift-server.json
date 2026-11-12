@@ -1,0 +1,80 @@
+{
+  "gate": "drift",
+  "model": "gpt-oss:20b",
+  "reviewedAt": "2026-11-12T00:58:42.166973Z",
+  "inputs": [
+    {
+      "path": "openspec/changes/establish-authoritative-core/specs/server-authority/spec.md",
+      "sha256": "c87437f7e99a54b90198b02af74090bacac7d14b5c5283347d433deec88c97bc"
+    },
+    {
+      "path": "openspec/changes/pair-and-recover-rooms/specs/matchmaking/spec.md",
+      "sha256": "30db61e7f2ac4b53ce6bf9994dd6cbce5aafffba8c4f71aab4cd331af802baa8"
+    },
+    {
+      "path": "openspec/changes/complete-fleet-and-combat/specs/gameplay/spec.md",
+      "sha256": "b2efd779b59abded62abe50647380b88ccc7f0957aa19fbbfab915dbc85e8b1f"
+    },
+    {
+      "path": "openspec/changes/finish-match-experience/specs/room-experience/spec.md",
+      "sha256": "fbf785525c97cb7438ef52f31ee2add14fabae8dc274849fdec95d600571a56d"
+    },
+    {
+      "path": "server/rooms.ts",
+      "sha256": "ecc2d94861bbf62d32510adf44a5b6fc7c7fa45992cdf0ec5e52229f798fccdf"
+    },
+    {
+      "path": "server/http.ts",
+      "sha256": "4f81883309d89db62aaacf38fed5f04e7e949a9a172e6adeacc6d2611fc30823"
+    },
+    {
+      "path": "server/rules.ts",
+      "sha256": "1fb7a508cbd6a9cc655f2c2406a35a42389f5b210fc47634475ccdeb61441e91"
+    },
+    {
+      "path": "server/index.ts",
+      "sha256": "8f3942399b40578ed8cf30f20912a590023ae5da056462fb6c609e5071ff2b16"
+    },
+    {
+      "path": "shared/protocol.ts",
+      "sha256": "ac7a03259f9ffeb1302e60ee07ad71c883f2a5064d42bbc9bca157af9683bb94"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "high",
+      "anchor": "rooms.ts",
+      "issue": "Missing enforcement of 30‑second absence rule",
+      "impact": "Participants who become absent for 30 s are only marked as absent but the room is not closed or the opponent is not notified. This violates the specification that a 30‑second absence should trigger a room closure or forfeit, leading to stale rooms and potential denial of service.",
+      "recommendation": "Add logic in `sweep` to close or forfeit rooms when a participant has been absent for ≥30 s, mirroring the 90‑second expiry handling. Ensure the room state is updated and a publish event is emitted."
+    },
+    {
+      "severity": "medium",
+      "anchor": "rooms.ts",
+      "issue": "No handling of 30‑second absence for waiting/placement phases",
+      "impact": "The spec requires that a 30‑second absence should close waiting or placement rooms. Current code only sets `present` to false, leaving the room open and potentially allowing a new participant to join the same room, which could violate fairness.",
+      "recommendation": "Extend the absence handling to close rooms in `waiting` or `placement` phases when a participant is absent for ≥30 s, and publish the closure."
+    },
+    {
+      "severity": "medium",
+      "anchor": "rooms.ts",
+      "issue": "Potential race condition in `session` when a token is reused after expiration",
+      "impact": "If a token is reused before the sweep removes it, the session may be incorrectly restored, leading to unauthorized access.",
+      "recommendation": "Add a check that the token is still present in `sessions` after the sweep, or generate a new token on each join to avoid reuse."
+    },
+    {
+      "severity": "low",
+      "anchor": "http.ts",
+      "issue": "Body size limit of 12 kb may be insufficient for large fleets or chat history",
+      "impact": "Clients sending large snapshots or chat logs could receive 413 errors unnecessarily.",
+      "recommendation": "Increase the JSON body limit or provide a separate endpoint for bulk data."
+    },
+    {
+      "severity": "low",
+      "anchor": "shared/protocol.ts",
+      "issue": "`validFleet` does not check for ships touching diagonally",
+      "impact": "The spec allows ships to touch but not overlap; diagonal touching is not explicitly prohibited, but may be unintended.",
+      "recommendation": "Clarify whether diagonal adjacency is allowed and adjust validation accordingly."
+    }
+  ]
+}

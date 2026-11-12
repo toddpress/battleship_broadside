@@ -1,0 +1,86 @@
+{
+  "gate": "architecture",
+  "model": "gpt-oss:20b",
+  "reviewedAt": "2026-11-12T00:28:42.78194Z",
+  "inputs": [
+    {
+      "path": "docs/BROADSIDE-CHECKPOINT.md",
+      "sha256": "d47e755935a81614ddd1a76814454c0a7f6b3f94984bad0cb0840afbccad92da"
+    },
+    {
+      "path": "openspec/changes/establish-authoritative-core/design.md",
+      "sha256": "f3071e204e2b7357cf8b5a33d8b10dd2988c0610ca5f8fe61b60b8da57cf0899"
+    },
+    {
+      "path": "openspec/changes/pair-and-recover-rooms/design.md",
+      "sha256": "5a5a1dc9d14262b4e7c19184f5a6db89bbaf71509f378f93140f174d5c4ca9f4"
+    },
+    {
+      "path": "openspec/changes/complete-fleet-and-combat/design.md",
+      "sha256": "397b6d071d66c5890640c9f621e35e549e439edefea4aef365960f46b313ac0d"
+    },
+    {
+      "path": "openspec/changes/render-orthographic-battlefield/design.md",
+      "sha256": "d44332c8f34296fe192ee12707f2f4e89db05c0e700d802def302ac5e045ba2a"
+    },
+    {
+      "path": "openspec/changes/finish-match-experience/design.md",
+      "sha256": "38bd5e4ba2556ff6f40134b68c42c0c23847d5fb86330a560852044cf14f11de"
+    },
+    {
+      "path": "openspec/changes/verify-and-demonstrate-sdd/design.md",
+      "sha256": "c8534f983b002d71f127afa3263010dfbb6e5c555bbcc285686fdfc4ace8b6df"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "high",
+      "anchor": "docs/BROADSIDE-CHECKPOINT.md",
+      "issue": "Missing explicit lifecycle for server restart",
+      "impact": "A server restart invalidates all active sessions but the design does not specify how clients recover or how state is persisted across restarts. This can lead to orphaned seats, lost game state, and inconsistent user experience.",
+      "recommendation": "Add a clear restart boundary policy: persist minimal session metadata (e.g., room ID, seat token, last revision) to durable storage, and on restart, rehydrate active rooms or mark them as expired. Document client reconnection logic and provide a migration path for in‑flight games."
+    },
+    {
+      "severity": "medium",
+      "anchor": "openspec/changes/establish-authoritative-core/design.md",
+      "issue": "No explicit concurrency control for simultaneous ready submissions",
+      "impact": "If both players submit ready at the same time, the current design may allow race conditions where the first commit wins but the second is silently ignored or causes a conflict. This can result in inconsistent game start state.",
+      "recommendation": "Implement an idempotent ready command with a unique request ID and a server‑side lock per room. Return a 409 with the current revision if a ready has already been processed, and instruct the client to retry with the updated revision."
+    },
+    {
+      "severity": "medium",
+      "anchor": "openspec/changes/pair-and-recover-rooms/design.md",
+      "issue": "Absent explicit handling of partial room cleanup after five minutes",
+      "impact": "Rooms that remain open for more than five minutes after finish may accumulate stale data in GunDB, potentially leaking memory or exposing stale chat messages.",
+      "recommendation": "Add a scheduled cleanup job that scans rooms with a finished timestamp older than five minutes and removes them from GunDB and any in‑memory caches. Ensure the job runs in a single process to avoid race conditions."
+    },
+    {
+      "severity": "low",
+      "anchor": "openspec/changes/complete-fleet-and-combat/design.md",
+      "issue": "Touching ships are allowed but not explicitly documented in the rules",
+      "impact": "Clients may interpret touching as illegal, leading to user confusion or rejected placements.",
+      "recommendation": "Clarify in the public specification that ships may touch but not overlap, and provide a visual cue in the placement UI to indicate valid touching."
+    },
+    {
+      "severity": "low",
+      "anchor": "openspec/changes/render-orthographic-battlefield/design.md",
+      "issue": "Adaptive quality thresholds are hard‑coded but not exposed for configuration",
+      "impact": "Different deployment environments (e.g., low‑end devices) may not achieve the desired frame budget, causing poor UX.",
+      "recommendation": "Expose the quality thresholds (p95, p50, window durations) as configurable parameters or environment variables, and provide a fallback to a minimal quality mode if thresholds cannot be met."
+    },
+    {
+      "severity": "medium",
+      "anchor": "openspec/changes/finish-match-experience/design.md",
+      "issue": "Chat message size limit is 240 Unicode code points but no mention of emoji or surrogate pairs",
+      "impact": "Users may experience truncated messages when using emojis or complex characters, leading to inconsistent display.",
+      "recommendation": "Define the limit in terms of UTF‑16 code units or use a library that counts grapheme clusters to ensure emojis are counted correctly."
+    },
+    {
+      "severity": "high",
+      "anchor": "openspec/changes/verify-and-demonstrate-sdd/design.md",
+      "issue": "No defined process for handling model drift or changes in Ollama responses",
+      "impact": "If the model changes its output format, the review harness may fail or produce incorrect findings, undermining the verification process.",
+      "recommendation": "Implement a schema validation step for model responses and a drift detection mechanism that flags unexpected fields or missing required data. Include a rollback plan to revert to a known good model version."
+    }
+  ]
+}

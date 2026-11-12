@@ -1,0 +1,56 @@
+{
+  "gate": "drift",
+  "model": "gpt-oss:20b",
+  "reviewedAt": "2026-11-12T01:03:25.702494Z",
+  "inputs": [
+    {
+      "path": "openspec/changes/finish-match-experience/specs/room-experience/spec.md",
+      "sha256": "fbf785525c97cb7438ef52f31ee2add14fabae8dc274849fdec95d600571a56d"
+    },
+    {
+      "path": "src/session.ts",
+      "sha256": "5f247975c14b99370e93e182a079c357d45079765c80ff36958198f703db2e0b"
+    },
+    {
+      "path": "src/main.ts",
+      "sha256": "5a99c3fd9a3ada722fc56dd6a8f3a6ac16ca0f84f386075f48f36cf205b44586"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "medium",
+      "anchor": "openspec/changes/finish-match-experience/specs/room-experience/spec.md",
+      "issue": "Requirement: Participant chat specifies that the server SHALL store at most 50 messages, but the client implementation does not enforce or verify this limit. The UI simply renders all messages in the snapshot without any trimming logic. This could lead to excessive memory usage or UI lag if the server fails to enforce the limit.",
+      "impact": "Potential performance degradation and violation of the documented requirement.",
+      "recommendation": "Add client‑side logic to discard or ignore messages beyond the 50‑message window, or validate that the server never returns more than 50 messages. Update the spec to clarify that the client may enforce the limit if the server is misbehaving."
+    },
+    {
+      "severity": "low",
+      "anchor": "src/session.ts",
+      "issue": "The `request` helper uses `AbortSignal.timeout(5_000)` which aborts the fetch after 5 s. If the network is slow, the request may fail and the error handling will treat it as a generic `ApiError`. This could cause the UI to display a generic connection error instead of a more specific timeout message.",
+      "impact": "User experience may be confusing when a request times out.",
+      "recommendation": "Add a specific timeout error handling path or expose a timeout error code so the UI can show a clearer message."
+    },
+    {
+      "severity": "low",
+      "anchor": "src/main.ts",
+      "issue": "The `chat` form allows a maximum of 480 characters in the input field (`maxlength=\"480\"`) but the spec requires a maximum of 240 characters. The client performs a 240‑character check only after trimming whitespace, but the input field still accepts up to 480 characters, potentially confusing users.",
+      "impact": "UI inconsistency with the documented requirement.",
+      "recommendation": "Set the input `maxlength` attribute to 240 to match the spec."
+    },
+    {
+      "severity": "low",
+      "anchor": "src/main.ts",
+      "issue": "The `render` function updates the `link` text based on the `link` state but does not update the `link` element's `aria-live` region. Users relying on screen readers may not be notified of link status changes.",
+      "impact": "Reduced accessibility.",
+      "recommendation": "Add `aria-live=\"polite\"` to the `link` element or programmatically notify screen readers when the link status changes."
+    },
+    {
+      "severity": "low",
+      "anchor": "src/main.ts",
+      "issue": "The `Session` class registers `online` and `offline` event listeners on the window but never removes them in `dispose` if the session is never started. This could lead to memory leaks if `dispose` is called before `start`.",
+      "impact": "Potential memory leak.",
+      "recommendation": "Guard the removal of event listeners in `dispose` by checking if they were added."
+    }
+  ]
+}

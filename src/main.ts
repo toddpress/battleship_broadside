@@ -1,356 +1,374 @@
-import * as THREE from "three";
-import Gun from "gun/gun";
-import "./style.css";
+import './style.css';
+import { Battlefield } from './battlefield.ts';
+import { SHIPS, cellKey, cells, inBounds, label, randomFleet, validFleet } from '../shared/protocol.ts';
+import type { Cell, Command, Placement, Snapshot } from '../shared/protocol.ts';
+import { ApiError, Session } from './session.ts';
 
-type Shot = { x: number; y: number; hit: boolean };
-type Match = {
-  id: string;
-  status: "playing" | "finished";
-  player: number;
-  turn: number;
-  winner: number | null;
-  revision: number;
-  lastShot: {
-    by: number;
-    x: number;
-    y: number;
-    hit: boolean;
-    sunk: boolean;
-  } | null;
-  ownShips: number[][][];
-  shotsFired: Shot[];
-  incoming: Shot[];
-};
-type State =
-  | { status: "waiting"; token: string; position: number }
-  | { status: "matched"; token: string; match: Match };
-const app = document.querySelector<HTMLDivElement>("#app")!;
-const tokenKey = "broadside-session";
-let token = sessionStorage.getItem(tokenKey) ?? "";
-let state: State | null = null,
-  gunSubscription: any = null,
-  refreshInFlight = false,
-  selected: { x: number; y: number } | null = null;
-const GUN_ENDPOINT =
-  location.port === "5173"
-    ? `${location.protocol}//${location.hostname}:8787/gun`
-    : `${location.origin}/gun`;
-const gun: any = Gun({
-  peers: [GUN_ENDPOINT],
-  localStorage: false,
-  radisk: false,
-});
-const api = async (path: string, body?: object) => {
-  const response = await fetch(
-    "/api/" + path,
-    body
-      ? {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(body),
-        }
-      : undefined,
-  );
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error ?? "Request failed");
-  return data;
-};
+const app = document.querySelector<HTMLDivElement>('#app')!;
+app.innerHTML = `
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Broadside home"><span class="emblem" aria-hidden="true">✦</span><span>BROADSIDE</span></a>
+    <span class="top-title">TACTICAL NAVAL COMBAT</span>
+    <span class="network"><i></i><span id="link" role="status" aria-live="polite">STANDBY</span></span>
+  </header>
+  <main class="layout">
+    <section class="visual" aria-label="Tactical battlefield">
+      <div id="scene"></div>
+      <div class="scene-heading"><span class="eyebrow">NORTH ATLANTIC</span><span id="view-label">FLEET COMMAND</span></div>
+      <div class="compass" aria-hidden="true"><span>N</span><b>◇</b></div>
+      <div class="scene-footer"><span id="coordinate">GRID 10 × 10</span><span>DRAG TO ORBIT · SCROLL TO ZOOM</span></div>
+    </section>
+    <aside class="sidebar">
+      <div class="brief" id="brief">
+        <p class="eyebrow" id="phase">FLEET COMMAND</p>
+        <h1 id="headline">Command<br>the fleet.</h1>
+        <p id="description">Two captains, one sea. Deploy your ships and outmaneuver your opponent in a turn-based naval duel.</p>
+        <div class="radar" id="radar" hidden aria-hidden="true"><div></div><span></span></div>
+        <button id="join" class="primary">Find opponent <span>↗</span></button>
+      </div>
+      <section id="tactics" hidden aria-label="Board controls">
+        <div id="placement" hidden>
+          <div class="row"><span class="eyebrow">DEPLOYMENT</span><button id="random" class="quiet">Randomize</button></div>
+          <div class="fleet-list" id="fleet-list"></div>
+          <button id="rotate" class="quiet">↻ Rotate selected ship</button>
+        </div>
+        <div id="views" class="segmented" hidden>
+          <button id="enemy" aria-pressed="true">Enemy waters</button>
+          <button id="friendly" aria-pressed="false">Your fleet</button>
+        </div>
+        <div class="board-layout" id="board-layout">
+          <div class="column-labels" aria-hidden="true">A B C D E F G H I J</div>
+          <div class="row-labels" aria-hidden="true">1 2 3 4 5 6 7 8 9 10</div>
+          <div id="board" role="group" aria-label="Tactical grid"></div>
+        </div>
+        <div class="action-row">
+          <button id="action" class="primary">Lock fleet</button>
+          <button id="rematch" class="primary" hidden>Request rematch</button>
+        </div>
+      </section>
+      <p id="notice" class="notice" role="status"></p>
+      <section id="communications" hidden aria-label="Room chat">
+        <div class="row"><span class="eyebrow">ROOM CHAT</span><span id="opponent" class="minor"></span></div>
+        <div id="messages" role="log" aria-label="Messages"></div>
+        <form id="chat"><label class="sr-only" for="message">Message</label><input id="message" placeholder="Message opponent" autocomplete="off" maxlength="480"><button aria-label="Send message">↑</button></form>
+      </section>
+      <button id="leave" class="quiet leave" hidden>Leave room</button>
+    </aside>
+  </main>
+  <footer class="bottom"><span>PROJECT BROADSIDE</span><span id="room-id">OPEN WATERS</span></footer>
+`;
 
-app.innerHTML = `<div id="scene"></div><div class="grain"></div><header><div class="brand"><span class="insignia">✦</span><div><strong>BROADSIDE</strong><small>FLEET COMMAND / ONLINE</small></div></div><div class="status"><span id="netdot"></span><span id="net">CONNECTING</span></div></header><main id="panel"><section id="intro"><div class="eyebrow">TACTICAL NAVAL ENGAGEMENT // 001</div><h1>THE OCEAN<br><em>IS YOURS.</em></h1><p>Two captains. Two fleets. One sea. Deploy automatically and engage in turn-based naval combat.</p><button id="deploy">FIND OPPONENT <span>→</span></button><div class="minor">LIVE MULTIPLAYER · 10×10 GRID · NO ACCOUNT REQUIRED</div></section></main><footer><span>PROJECT BROADSIDE // SDD DEMONSTRATOR</span><span id="footerRight">AWAITING ORDERS</span></footer>`;
-const panel = document.querySelector<HTMLElement>("#panel")!;
-const sceneRoot = document.querySelector<HTMLElement>("#scene")!;
-const scene = new THREE.Scene();
-scene.background = new THREE.Color("#071725");
-scene.fog = new THREE.FogExp2("#071725", 0.015);
-const camera = new THREE.PerspectiveCamera(
-  58,
-  innerWidth / innerHeight,
-  0.1,
-  300,
-);
-camera.position.set(0, 21, 34);
-camera.lookAt(0, 0, -12);
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.setSize(innerWidth, innerHeight);
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-sceneRoot.appendChild(renderer.domElement);
-scene.add(new THREE.HemisphereLight("#7abdd1", "#05121c", 2.4));
-const sun = new THREE.DirectionalLight("#92b0bf", 2.8);
-sun.position.set(-18, 36, -20);
-scene.add(sun);
-const water = new THREE.Mesh(
-  new THREE.PlaneGeometry(350, 350, 48, 48),
-  new THREE.MeshStandardMaterial({
-    color: "#0c3c50",
-    metalness: 0.54,
-    roughness: 0.38,
-    transparent: true,
-    opacity: 0.93,
-  }),
-);
-water.rotation.x = -Math.PI / 2;
-water.position.y = -0.22;
-scene.add(water);
-const grid = new THREE.Group();
-scene.add(grid);
-const tileMeshes: THREE.Mesh[] = [];
-const geometries = new THREE.BoxGeometry(2.12, 0.055, 2.12);
-for (let y = 0; y < 10; y++)
-  for (let x = 0; x < 10; x++) {
-    const mesh = new THREE.Mesh(
-      geometries,
-      new THREE.MeshStandardMaterial({
-        color: (x + y) % 2 ? "#103d50" : "#18475a",
-        transparent: true,
-        opacity: 0.78,
-        metalness: 0.3,
-        roughness: 0.55,
-      }),
-    );
-    mesh.position.set((x - 4.5) * 2.3, 0.08, (y - 4.5) * 2.3 - 12);
-    mesh.userData = { x, y };
-    grid.add(mesh);
-    tileMeshes.push(mesh);
-  }
-const guide = new THREE.GridHelper(23, 10, "#4d8b99", "#265565");
-guide.position.set(0, 0.14, -12);
-scene.add(guide);
-const stars = new THREE.Group();
-scene.add(stars);
-const white = new THREE.MeshBasicMaterial({ color: "#a1d8d8" });
-for (let i = 0; i < 60; i++) {
-  const sp = new THREE.Mesh(new THREE.SphereGeometry(0.022, 4, 4), white);
-  sp.position.set(
-    Math.random() * 160 - 80,
-    20 + Math.random() * 35,
-    -45 - Math.random() * 80,
-  );
-  stars.add(sp);
-}
-function ship(x: number, z: number, scale = 1) {
-  const group = new THREE.Group();
-  const hull = new THREE.Mesh(
-    new THREE.BoxGeometry(1.8, 0.85, 5),
-    new THREE.MeshStandardMaterial({
-      color: "#677c81",
-      metalness: 0.65,
-      roughness: 0.4,
-    }),
-  );
-  hull.position.y = 0.7;
-  group.add(hull);
-  const deck = new THREE.Mesh(
-    new THREE.BoxGeometry(1.3, 0.6, 1.7),
-    new THREE.MeshStandardMaterial({
-      color: "#9bada8",
-      metalness: 0.6,
-      roughness: 0.35,
-    }),
-  );
-  deck.position.set(0, 1.25, -0.4);
-  group.add(deck);
-  const turret = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.4, 0.5, 0.28, 8),
-    new THREE.MeshStandardMaterial({ color: "#bfcbbe" }),
-  );
-  turret.position.set(0, 1.1, 1.65);
-  group.add(turret);
-  group.position.set(x, 0, z);
-  group.scale.setScalar(scale);
-  scene.add(group);
-  return group;
-}
-const heroShip = ship(-21, -24, 2.4);
-heroShip.rotation.y = -0.27;
-const raycaster = new THREE.Raycaster(),
-  pointer = new THREE.Vector2();
-renderer.domElement.addEventListener("click", (event) => {
-  if (
-    state?.status !== "matched" ||
-    state.match.status !== "playing" ||
-    state.match.turn !== state.match.player
-  )
-    return;
-  const rect = renderer.domElement.getBoundingClientRect();
-  pointer.set(
-    ((event.clientX - rect.left) / rect.width) * 2 - 1,
-    (-(event.clientY - rect.top) / rect.height) * 2 + 1,
-  );
-  raycaster.setFromCamera(pointer, camera);
-  const hit = raycaster.intersectObjects(tileMeshes)[0];
-  if (hit) {
-    selected = { x: hit.object.userData.x, y: hit.object.userData.y };
-    renderPanel();
-  }
-});
-function repaint() {
-  const shots = state?.status === "matched" ? state.match.shotsFired : [];
-  for (const mesh of tileMeshes) {
-    const { x, y } = mesh.userData;
-    const s = shots.find((s) => s.x === x && s.y === y);
-    const picked = selected?.x === x && selected?.y === y;
-    const mat = mesh.material as THREE.MeshStandardMaterial;
-    mat.color.set(
-      s
-        ? s.hit
-          ? "#ff745e"
-          : "#35687a"
-        : picked
-          ? "#c9aa72"
-          : (x + y) % 2
-            ? "#103d50"
-            : "#18475a",
-    );
-    mat.emissive.set(s?.hit ? "#6c190f" : picked ? "#433012" : "#000000");
-  }
-}
-const label = (x: number, y: number) => `${"ABCDEFGHIJ"[x]}${y + 1}`;
-const mini = (ships: number[][][], incoming: Shot[]) => {
-  const owned = new Set(
-    ships.flatMap((cells) => cells.map((c) => c.join(","))),
-  );
-  return `<div class="mini-grid">${Array.from({ length: 100 }, (_, i) => {
-    const x = i % 10,
-      y = Math.floor(i / 10),
-      hit = incoming.find((s) => s.x === x && s.y === y);
-    return `<span class="mini-cell ${owned.has(`${x},${y}`) ? "ship" : ""} ${hit ? (hit.hit ? "damage" : "miss") : ""}" title="${label(x, y)}"></span>`;
-  }).join("")}</div>`;
-};
-function renderPanel() {
-  repaint();
-  if (!state) return;
-  if (state.status === "waiting") {
-    panel.innerHTML = `<section class="gamebox waiting"><div class="eyebrow">MATCHMAKING // LIVE QUEUE</div><div class="radar"><div class="radar-beam"></div><span>⌖</span></div><h2>SCANNING THE HORIZON</h2><p>You're on deck. The next captain to join will be paired with you automatically.</p><div class="pulse"><i></i> WAITING FOR ANOTHER PLAYER</div><button id="leave">CANCEL SEARCH</button></section>`;
-  } else {
-    const m = state.match,
-      ended = m.status === "finished",
-      mine = m.turn === m.player;
-    const message = ended
-      ? m.winner === m.player
-        ? "VICTORY — ENEMY FLEET DESTROYED"
-        : "DEFEAT — FLEET LOST"
-      : mine
-        ? "YOUR TURN — SELECT TARGET"
-        : "ENEMY TURN — STAND BY";
-    const fired = new Set(m.shotsFired.map((s) => `${s.x},${s.y}`));
-    const canFire =
-      mine && !ended && selected && !fired.has(`${selected.x},${selected.y}`);
-    panel.innerHTML = `<section class="gamebox playing"><div class="eyebrow">ENGAGEMENT // ${m.id.slice(0, 8).toUpperCase()}</div><h2>${message}</h2><p>${ended ? "Mission complete. Rematch when ready." : mine ? "Choose a grid square by clicking the sea, then fire." : "The opposing captain is taking aim."}</p><div class="scoreboard"><div><strong>${m.shotsFired.filter((s) => s.hit).length}</strong><span>YOUR HITS</span></div><div><strong>${m.incoming.filter((s) => s.hit).length}</strong><span>ENEMY HITS</span></div><div><strong>${m.shotsFired.length}</strong><span>SHOTS FIRED</span></div></div><div class="fleet-heading">YOUR FLEET <span>BLUE = SHIPS · RED = HITS</span></div>${mini(m.ownShips, m.incoming)}<div class="targetline">${selected ? `TARGET LOCK // ${label(selected.x, selected.y)}` : "TARGET // NONE SELECTED"}</div>${ended ? '<button id="again">NEW MATCH →</button>' : `<button id="fire" ${canFire ? "" : "disabled"}>FIRE AT ${selected ? label(selected.x, selected.y) : "TARGET"} →</button>`}<div class="minor">${m.lastShot ? `LAST SHOT ${label(m.lastShot.x, m.lastShot.y)} · ${m.lastShot.hit ? "HIT" : "MISS"}${m.lastShot.sunk ? " · SUNK" : ""}` : "AWAITING FIRST SALVO"}</div></section>`;
-  }
-  document
-    .querySelector<HTMLButtonElement>("#leave")
-    ?.addEventListener("click", () => void leave());
-  document
-    .querySelector<HTMLButtonElement>("#again")
-    ?.addEventListener("click", () => void leave(true));
-  document
-    .querySelector<HTMLButtonElement>("#fire")
-    ?.addEventListener("click", () => void shoot());
-  document.querySelector("#net")!.textContent =
-    state.status === "waiting" ? "SEARCHING" : "LINK ACTIVE";
-  document.querySelector("#netdot")!.classList.add("connected");
-  document.querySelector("#footerRight")!.textContent =
-    state.status === "waiting"
-      ? "AWAITING OPPONENT"
-      : state.match.status === "finished"
-        ? "MISSION ENDED"
-        : "MULTIPLAYER SESSION ACTIVE";
-}
-async function refresh() {
-  if (!token || refreshInFlight) return;
-  refreshInFlight = true;
-  try {
-    state = await api("state/" + encodeURIComponent(token));
-    if (state.status === "matched") subscribe(state.match.id);
-    renderPanel();
-  } catch (e) {
-    token = "";
-    sessionStorage.removeItem(tokenKey);
-    unsubscribe();
-    state = null;
-    showStart((e as Error).message);
-  } finally {
-    refreshInFlight = false;
-  }
-}
-function unsubscribe() {
-  if (gunSubscription) {
-    gunSubscription.off();
-    gunSubscription = null;
-  }
-  subscribedMatch = "";
-}
-let subscribedMatch = "";
-function subscribe(id: string) {
-  if (subscribedMatch === id) return;
-  unsubscribe();
-  subscribedMatch = id;
-  gunSubscription = gun.get("broadside-v1").get("matches").get(id);
-  gunSubscription.on((event: any) => {
-    if (
-      event?.revision &&
-      state?.status === "matched" &&
-      Number(event.revision) > state.match.revision
-    )
-      void refresh();
+function get<E extends HTMLElement = HTMLElement>(id: string) { return document.getElementById(id) as E; }
+function button(id: string) { return get<HTMLButtonElement>(id); }
+const board = get('board');
+const shipButtons = new Map<string, HTMLButtonElement>();
+const squares: HTMLButtonElement[] = [];
+const input = get<HTMLInputElement>('message');
+let state: Snapshot | null = null;
+let link = 'idle';
+let draft: Placement[] = [];
+let selectedShip: Placement['id'] = 'carrier';
+let target: Cell | null = null;
+let hover: Cell | null = null;
+let view: 'friendly' | 'enemy' = 'enemy';
+let pending = false;
+let draftInvalid = false;
+let renderedChatSequence = 0;
+let focusedCell = 0;
+let battlefield: Battlefield | null = null;
+
+for (const ship of SHIPS) {
+  const control = document.createElement('button');
+  control.type = 'button';
+  control.draggable = true;
+  control.textContent = ship.name;
+  control.dataset.length = String(ship.length);
+  control.addEventListener('click', () => { selectedShip = ship.id; render(); });
+  control.addEventListener('dragstart', (event) => {
+    selectedShip = ship.id;
+    event.dataTransfer?.setData('text/plain', ship.id);
+    render();
   });
+  shipButtons.set(ship.id, control);
+  get('fleet-list').append(control);
 }
-async function join() {
-  try {
-    const s: State = await api("join", { token: token || undefined });
-    token = s.token;
-    sessionStorage.setItem(tokenKey, token);
-    state = s;
-    if (s.status === "matched") subscribe(s.match.id);
-    renderPanel();
-  } catch (e) {
-    showStart((e as Error).message);
-  }
+for (let index = 0; index < 100; index++) {
+  const cell = { x: index % 10, y: Math.floor(index / 10) };
+  const square = document.createElement('button');
+  square.type = 'button';
+  square.className = 'square';
+  square.dataset.cell = label(cell);
+  square.addEventListener('click', () => choose(cell));
+  square.addEventListener('focus', () => {
+    focusedCell = index;
+    squares.forEach((item, i) => { item.tabIndex = i === index ? 0 : -1; });
+  });
+  square.addEventListener('dragover', (event) => {
+    if (canPlace()) event.preventDefault();
+  });
+  square.addEventListener('drop', (event) => {
+    event.preventDefault();
+    const id = event.dataTransfer?.getData('text/plain');
+    if (SHIPS.some((ship) => ship.id === id)) {
+      selectedShip = id as Placement['id'];
+      choose(cell);
+    }
+  });
+  squares.push(square);
+  board.append(square);
 }
-async function shoot() {
-  if (state?.status !== "matched" || !selected) return;
-  try {
-    await api("shoot", { token, x: selected.x, y: selected.y });
-    selected = null;
-    await refresh();
-  } catch (e) {
-    alert((e as Error).message);
-    await refresh();
-  }
+for (const [id, axis] of [['board-layout .column-labels', 'columns'], ['board-layout .row-labels', 'rows']] as const) {
+  const container = document.querySelector('#' + id)!;
+  container.replaceChildren(...Array.from({ length: 10 }, (_, index) => {
+    const label = document.createElement('span');
+    label.textContent = axis === 'columns' ? String.fromCharCode(65 + index) : String(index + 1);
+    return label;
+  }));
 }
-async function leave(rejoin = false) {
-  if (token) await api("leave", { token }).catch(() => {});
-  token = "";
-  sessionStorage.removeItem(tokenKey);
-  unsubscribe();
-  state = null;
-  selected = null;
-  if (rejoin) void join();
-  else showStart();
-}
-function showStart(message = "") {
-  panel.innerHTML = `<section id="intro"><div class="eyebrow">TACTICAL NAVAL ENGAGEMENT // 001</div><h1>THE OCEAN<br><em>IS YOURS.</em></h1><p>Two captains. Two fleets. One sea. Deploy automatically and engage in turn-based naval combat.</p>${message ? `<p class="error">${message.replace(/[<>]/g, "")}</p>` : ""}<button id="deploy">FIND OPPONENT <span>→</span></button><div class="minor">LIVE MULTIPLAYER · 10×10 GRID · NO ACCOUNT REQUIRED</div></section>`;
-  document
-    .querySelector("#deploy")
-    ?.addEventListener("click", () => void join());
-}
-document.querySelector("#deploy")?.addEventListener("click", () => void join());
-if (token) void refresh();
-setInterval(() => {
-  if (token) void refresh();
-}, 2500);
-let frame = 0;
-function animate() {
-  requestAnimationFrame(animate);
-  frame += 0.008;
-  heroShip.position.y = Math.sin(frame) * 0.13;
-  water.position.y = -0.22 + Math.sin(frame * 0.8) * 0.05;
-  renderer.render(scene, camera);
-}
-animate();
-window.addEventListener("resize", () => {
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
+board.addEventListener('keydown', (event) => {
+  const delta: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  if (event.key.toLowerCase() === 'r' && canPlace()) { rotate(); return; }
+  const move = delta[event.key];
+  if (!move) return;
+  event.preventDefault();
+  const next = { x: focusedCell % 10 + move[0], y: Math.floor(focusedCell / 10) + move[1] };
+  if (inBounds(next)) squares[cellKey(next)].focus();
 });
+
+const canPlace = () => state?.phase === 'placement' && !state.ready[state.seat] && !pending && link === 'online';
+const canFire = () => state?.phase === 'playing' && state.turn === state.seat && state.present[1 - state.seat]
+  && !pending && link === 'online' && view === 'enemy';
+const tell = (text: string) => { get('notice').textContent = text; };
+function applyDraft(candidate: Placement[], cell: Cell) {
+  draftInvalid = !validFleet(candidate);
+  target = cell;
+  if (!draftInvalid) draft = candidate;
+  tell(draftInvalid ? 'Ships must fit on the board without overlapping.' : '');
+  render();
+}
+function choose(cell: Cell) {
+  if (canPlace()) {
+    applyDraft(draft.map((ship) => ship.id === selectedShip ? { ...ship, ...cell } : ship), cell);
+  } else if (canFire() && !state!.shots.some((shot) => shot.by === state!.seat && cellKey(shot) === cellKey(cell))) {
+    target = cell;
+    render();
+  }
+}
+function rotate() {
+  if (!canPlace()) return;
+  const ship = draft.find(({ id }) => id === selectedShip);
+  if (ship) applyDraft(draft.map((item) => item.id === selectedShip ? { ...item, vertical: !item.vertical } : item), ship);
+}
+try {
+  battlefield = new Battlefield(get('scene'), choose, (cell) => { hover = cell; coordinate(); });
+} catch {
+  get('scene').dataset.rendering = 'unavailable';
+  tell('3D rendering is unavailable. You can play using the tactical grid.');
+}
+
+function coordinate() {
+  get('coordinate').textContent = hover || target ? 'COORDINATE ' + label((hover ?? target)!) : 'GRID 10 × 10';
+}
+function setText(id: string, value: string) { get(id).textContent = value; }
+function render() {
+  const phase = state?.phase ?? 'intro';
+  const paired = Boolean(state?.matchId && phase !== 'closed');
+  const placement = phase === 'placement';
+  const finished = phase === 'finished';
+  const seat = state?.seat ?? 0;
+  const opponentPresent = Boolean(state?.present[1 - seat]);
+  const ready = Boolean(state?.ready[seat]);
+  const playing = phase === 'playing';
+  get('scene').dataset.phase = phase;
+  const linkLabel = link === 'online' ? 'LINK ACTIVE' : link === 'retrying' ? 'RECONNECTING' : 'STANDBY';
+  if (get('link').textContent !== linkLabel) setText('link', linkLabel);
+  get('link').parentElement!.dataset.link = link;
+  get('join').hidden = Boolean(state && phase !== 'closed') || link === 'retrying';
+  button('join').disabled = pending;
+  get('radar').hidden = phase !== 'waiting';
+  get('tactics').hidden = !paired;
+  get('placement').hidden = !placement;
+  get('views').hidden = placement;
+  get('communications').hidden = !paired;
+  get('leave').hidden = !state || phase === 'closed';
+  button('leave').disabled = pending || link !== 'online';
+  get('action').hidden = finished;
+  get('rematch').hidden = !finished;
+  button('rematch').disabled = pending || !opponentPresent || link !== 'online' || Boolean(state?.votes[seat]);
+  setText('rematch', state?.votes[seat] ? 'Rematch requested' : 'Request rematch');
+  button('rotate').disabled = !canPlace();
+  button('random').disabled = !canPlace();
+  setText('opponent', opponentPresent ? 'OPPONENT ONLINE' : 'OPPONENT AWAY');
+  setText('room-id', state ? 'ROOM ' + state.roomId.slice(0, 8).toUpperCase() : 'OPEN WATERS');
+  setText('phase', placement ? 'DEPLOYMENT' : playing ? 'ENGAGEMENT' : finished ? 'AFTER ACTION' : 'FLEET COMMAND');
+  if (phase === 'intro') {
+    get('headline').innerHTML = 'Command<br>the fleet.';
+    setText('description', link === 'expired' ? 'Your previous session ended. Find an opponent to deploy again.'
+      : link === 'retrying' ? 'Restoring your room connection…'
+      : 'Two captains, one sea. Deploy your ships and outmaneuver your opponent in a turn-based naval duel.');
+  } else if (phase === 'waiting') {
+    setText('headline', 'Scanning the horizon.');
+    setText('description', 'Waiting for another captain to join.');
+  } else if (placement) {
+    setText('headline', ready ? 'Fleet locked.' : 'Deploy your fleet.');
+    setText('description', ready ? 'Waiting for your opponent to lock their fleet.' : 'Choose a ship, then click or drag it to a grid square. Rotate with R.');
+  } else if (playing) {
+    setText('headline', state!.turn === seat ? 'Your turn.' : 'Enemy turn.');
+    const last = state!.shots.at(-1);
+    setText('description', !opponentPresent ? 'Combat paused while your opponent reconnects.'
+      : last ? label(last) + ' · ' + (last.sunk ? 'Ship sunk' : last.hit ? 'Hit' : 'Miss')
+      : 'Select an enemy coordinate and confirm to fire.');
+  } else if (finished) {
+    setText('headline', state!.winner === seat ? 'Victory.' : 'Defeat.');
+    setText('description', state!.reason === 'forfeit' ? 'The match ended by forfeit.' : 'The final ship has fallen.');
+  } else {
+    setText('headline', 'Room closed.');
+    setText('description', 'The engagement ended before combat.');
+  }
+
+  const own = placement || view === 'friendly';
+  const shots = state?.shots.filter((shot) => own ? shot.by !== seat : shot.by === seat) ?? [];
+  const fleet = placement && !ready ? draft : own ? state?.fleet ?? [] : shots.flatMap((shot) => shot.sunk ? [shot.sunk] : []);
+  const action = button('action');
+  action.textContent = placement ? ready ? 'Fleet locked' : 'Lock fleet' : target ? 'Fire at ' + label(target) : 'Select a target';
+  action.disabled = placement ? !canPlace() || !opponentPresent || draftInvalid || !validFleet(draft) : !canFire() || !target;
+  button('enemy').setAttribute('aria-pressed', String(view === 'enemy'));
+  button('friendly').setAttribute('aria-pressed', String(view === 'friendly'));
+  setText('view-label', paired ? own ? 'FRIENDLY WATERS' : 'ENEMY WATERS' : 'FLEET COMMAND');
+  for (const [id, control] of shipButtons) {
+    control.setAttribute('aria-pressed', String(id === selectedShip));
+    control.disabled = !canPlace();
+    control.draggable = canPlace();
+  }
+  const occupied = new Set(fleet.flatMap(cells).map(cellKey));
+  const marked = new Map(shots.map((shot) => [cellKey(shot), shot]));
+  squares.forEach((square, index) => {
+    const shot = marked.get(index);
+    const selected = Boolean(target && cellKey(target) === index);
+    const status = shot ? shot.hit ? 'hit' : 'miss' : occupied.has(index) ? 'ship' : 'clear';
+    square.dataset.status = status;
+    square.dataset.selected = String(selected);
+    square.setAttribute('aria-label', square.dataset.cell + ', ' + status);
+    square.setAttribute('aria-pressed', String(selected));
+    square.tabIndex = focusedCell === index ? 0 : -1;
+  });
+  battlefield?.setBoard({ fleet, shots, selected: target, invalid: draftInvalid, phase });
+  coordinate();
+  const messages = get('messages');
+  const latest = state?.chat.at(-1)?.sequence ?? 0;
+  if (latest !== renderedChatSequence) {
+    messages.replaceChildren(...(state?.chat ?? []).map((message) => {
+      const item = document.createElement('p');
+      const name = document.createElement('b');
+      name.textContent = message.from === seat ? 'You ' : 'Opponent ';
+      item.append(name, document.createTextNode(message.text));
+      return item;
+    }));
+    messages.scrollTop = messages.scrollHeight;
+    renderedChatSequence = latest;
+  }
+  input.disabled = link !== 'online';
+}
+
+const session = new Session((next, status, fresh) => {
+  const previous = state;
+  link = status;
+  state = next;
+  if (next?.matchId !== previous?.matchId || next?.roomId !== previous?.roomId) {
+    target = null;
+    draftInvalid = false;
+    draft = next?.phase === 'placement' ? randomFleet() : [];
+    view = next?.phase === 'placement' ? 'friendly' : 'enemy';
+    tell('');
+  }
+  if (next?.phase === 'playing' && previous?.phase !== 'playing') { view = 'enemy'; target = null; }
+  if (fresh && next && previous && next.shots.length > previous.shots.length) {
+    const shot = next.shots.at(-1)!;
+    view = shot.by === next.seat ? 'enemy' : 'friendly';
+    target = null;
+    battlefield?.play(shot);
+  }
+  render();
+});
+
+const errorMessages: Record<string, string> = {
+  STALE_REVISION: 'The board changed. Check the latest state and try again.',
+  OPPONENT_AWAY: 'Your opponent is reconnecting.',
+  SESSION_EXPIRED: 'Your session has expired.',
+  INVALID_MESSAGE: 'Enter a message of 1–240 characters.',
+  CHAT_RATE_LIMIT: 'You’re sending messages too quickly. Try again shortly.',
+  JOIN_RATE_LIMIT: 'Too many searches. Try again in a minute.',
+  INVALID_FLEET: 'Move or rotate the ships to fit the board.',
+};
+function errorMessage(error: unknown) {
+  return error instanceof ApiError ? errorMessages[error.message] ?? 'That action is unavailable in the current room state.'
+    : 'Connection interrupted. Try again when the link returns.';
+}
+async function perform(operation: () => Promise<void>) {
+  if (pending) return;
+  pending = true;
+  render();
+  tell('');
+  try { await operation(); }
+  catch (error) { tell(errorMessage(error)); }
+  finally { pending = false; render(); }
+}
+type Action = Command extends infer Item ? Item extends Command ? Omit<Item, 'id' | 'roomId'> : never : never;
+function send(action: Action) {
+  if (!state) return Promise.resolve();
+  return session.send({ ...action, id: crypto.randomUUID(), roomId: state.roomId });
+}
+button('join').onclick = () => void perform(() => session.join());
+button('leave').onclick = () => void perform(() => send({ kind: 'leave' }));
+button('random').onclick = () => { draft = randomFleet(); draftInvalid = false; target = null; tell(''); render(); };
+button('rotate').onclick = rotate;
+button('friendly').onclick = () => { view = 'friendly'; target = null; render(); };
+button('enemy').onclick = () => { view = 'enemy'; target = null; render(); };
+button('action').onclick = () => {
+  if (!state?.matchId) return;
+  const { matchId, matchRevision } = state;
+  if (canPlace()) {
+    const fleet = draft;
+    void perform(async () => {
+      try { await send({ kind: 'ready', matchId, revision: matchRevision, fleet }); }
+      catch (error) {
+        const current = state;
+        if (!(error instanceof ApiError && error.message === 'STALE_REVISION') ||
+          current?.phase !== 'placement' || current.matchId !== matchId || current.ready[current.seat] ||
+          !current.present[1 - current.seat] || draft !== fleet) throw error;
+        await send({ kind: 'ready', matchId, revision: current.matchRevision, fleet });
+      }
+    });
+  } else if (canFire() && target) {
+    const cell = target;
+    void perform(() => send({ kind: 'fire', matchId, revision: matchRevision, ...cell }));
+  }
+};
+button('rematch').onclick = () => {
+  const matchId = state?.matchId;
+  if (matchId) void perform(() => send({ kind: 'rematch', matchId }));
+};
+get<HTMLFormElement>('chat').onsubmit = (event) => {
+  event.preventDefault();
+  const text = input.value;
+  if (!text.trim()) return;
+  if ([...text.trim()].length > 240) { tell(errorMessages.INVALID_MESSAGE); return; }
+  void perform(async () => {
+    await send({ kind: 'chat', text });
+    if (input.value === text) input.value = '';
+  });
+};
+
+render();
+session.start();
+function dispose() {
+  session.dispose();
+  battlefield?.dispose();
+  battlefield = null;
+  window.removeEventListener('pagehide', onPageHide);
+}
+function onPageHide(event: PageTransitionEvent) {
+  if (!event.persisted) dispose();
+}
+window.addEventListener('pagehide', onPageHide);
+if (import.meta.hot) import.meta.hot.dispose(dispose);

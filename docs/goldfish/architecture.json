@@ -1,0 +1,86 @@
+{
+  "gate": "architecture",
+  "model": "gpt-oss:20b",
+  "reviewedAt": "2026-11-12T00:27:07.287918Z",
+  "inputs": [
+    {
+      "path": "docs/BROADSIDE-CHECKPOINT.md",
+      "sha256": "66939cd72d8350cfdbe62f9c0efaecda712c208c0ce709c2b52240f81312d3a6"
+    },
+    {
+      "path": "openspec/changes/establish-authoritative-core/design.md",
+      "sha256": "fe03a706581f6eeb7fe580bd43e9da5488d0fba5ad40310e62baea92d8a14a01"
+    },
+    {
+      "path": "openspec/changes/pair-and-recover-rooms/design.md",
+      "sha256": "4316e3be9afa69a3c627452b0f487f1e196b7a9092deb2f9b9adae8292bab941"
+    },
+    {
+      "path": "openspec/changes/complete-fleet-and-combat/design.md",
+      "sha256": "397b6d071d66c5890640c9f621e35e549e439edefea4aef365960f46b313ac0d"
+    },
+    {
+      "path": "openspec/changes/render-orthographic-battlefield/design.md",
+      "sha256": "70aeeb12f4e7cd9f9f3c1bacb774ae5720976cda409647bc69ba33f2773dabf4"
+    },
+    {
+      "path": "openspec/changes/finish-match-experience/design.md",
+      "sha256": "38bd5e4ba2556ff6f40134b68c42c0c23847d5fb86330a560852044cf14f11de"
+    },
+    {
+      "path": "openspec/changes/verify-and-demonstrate-sdd/design.md",
+      "sha256": "c8534f983b002d71f127afa3263010dfbb6e5c555bbcc285686fdfc4ace8b6df"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "high",
+      "anchor": "docs/BROADSIDE-CHECKPOINT.md",
+      "issue": "Missing explicit versioning for API contracts",
+      "impact": "Clients may break if server changes without notification",
+      "recommendation": "Add a semantic version header to all API responses and document deprecation policy in the spec"
+    },
+    {
+      "severity": "medium",
+      "anchor": "docs/BROADSIDE-CHECKPOINT.md",
+      "issue": "Inconsistent heartbeat and lease timing values across documents",
+      "impact": "Potential race conditions in reconnection logic",
+      "recommendation": "Standardize on a single set of timing constants (e.g., 10s heartbeat, 30s pause, 90s expiry) and reference them in all design files"
+    },
+    {
+      "severity": "medium",
+      "anchor": "openspec/changes/establish-authoritative-core/design.md",
+      "issue": "DTO construction uses allowlist but no explicit schema validation",
+      "impact": "Untrusted input could bypass field filtering",
+      "recommendation": "Introduce JSON Schema or TypeScript type guards for all incoming DTOs and document the validation pipeline"
+    },
+    {
+      "severity": "medium",
+      "anchor": "openspec/changes/pair-and-recover-rooms/design.md",
+      "issue": "GunDB transactions cannot enforce room capacity",
+      "impact": "Race conditions may allow more than two players in a room",
+      "recommendation": "Add a server‑side capacity check before committing a new seat and reject excess join attempts with a clear error code"
+    },
+    {
+      "severity": "low",
+      "anchor": "openspec/changes/complete-fleet-and-combat/design.md",
+      "issue": "Touching ships are allowed but not explicitly documented in rules",
+      "impact": "Players may misinterpret placement legality",
+      "recommendation": "Clarify in the rule set that ships may touch but not overlap, and provide visual feedback during placement"
+    },
+    {
+      "severity": "low",
+      "anchor": "openspec/changes/render-orthographic-battlefield/design.md",
+      "issue": "Frame‑time hysteresis is mentioned but no quantitative target is specified",
+      "impact": "Performance may degrade on low‑end devices without guidance",
+      "recommendation": "Define a target frame time (e.g., <16ms for 60fps) and include a fallback path for devices that cannot meet it"
+    },
+    {
+      "severity": "low",
+      "anchor": "openspec/changes/finish-match-experience/design.md",
+      "issue": "Chat message limit is 240 Unicode code points but no mention of emoji surrogate pairs",
+      "impact": "Users may exceed the limit unintentionally when using emojis",
+      "recommendation": "Count grapheme clusters instead of code points for the chat limit"
+    }
+  ]
+}

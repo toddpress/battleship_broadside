@@ -1,0 +1,75 @@
+{
+  "gate": "plan",
+  "model": "gpt-oss:20b",
+  "reviewedAt": "2026-11-12T00:27:42.876378Z",
+  "inputs": [
+    {
+      "path": "openspec/changes/verify-and-demonstrate-sdd/tasks.md",
+      "sha256": "f83f51defa44d7e5389f9dc8efe1a6e439cb9c75affba5692d809580f919f7fe"
+    },
+    {
+      "path": "openspec/changes/establish-authoritative-core/tasks.md",
+      "sha256": "1775af1e6227b3c22ba19018777ed35ffd0152a5e528485cb4d6bab1737e9264"
+    },
+    {
+      "path": "openspec/changes/pair-and-recover-rooms/tasks.md",
+      "sha256": "aaff3c8745da9824477893e6528f5c5e1cd323581723520e0dc1acbc56cd849d"
+    },
+    {
+      "path": "openspec/changes/complete-fleet-and-combat/tasks.md",
+      "sha256": "db41436a417c5ed59d8f67cd3d9357c50f7cd52c0944545059904d7d99d78a9f"
+    },
+    {
+      "path": "openspec/changes/render-orthographic-battlefield/tasks.md",
+      "sha256": "bb89d417808e021f7e8828da215522c0c51100556f1fca6e509c2ee0ad3836eb"
+    },
+    {
+      "path": "openspec/changes/finish-match-experience/tasks.md",
+      "sha256": "e4af34eb2a95cad6570650c3285d501cf8ca666d357d84d6681e6795aab1e01a"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "high",
+      "anchor": "openspec/changes/verify-and-demonstrate-sdd/tasks.md",
+      "issue": "Missing explicit verification of GPU measurements and privacy evidence",
+      "impact": "Potential non‑compliance with performance and privacy requirements",
+      "recommendation": "Add a dedicated step to capture and archive GPU metrics and privacy logs, and link them to the corresponding requirement IDs."
+    },
+    {
+      "severity": "medium",
+      "anchor": "openspec/changes/establish-authoritative-core/tasks.md",
+      "issue": "No mention of handling clock drift or time zone differences in repository adapter",
+      "impact": "Could lead to inconsistent timestamps across environments",
+      "recommendation": "Document and test clock normalization logic, ensuring all timestamps are stored in UTC and validated against a reference clock."
+    },
+    {
+      "severity": "medium",
+      "anchor": "openspec/changes/pair-and-recover-rooms/tasks.md",
+      "issue": "Lease renewal test only covers exact 30s and 90s boundaries, not sub‑second variations",
+      "impact": "Edge cases may cause premature lease expiration or stale state",
+      "recommendation": "Extend tests to cover sub‑second boundaries and verify graceful handling of near‑expiry renewals."
+    },
+    {
+      "severity": "low",
+      "anchor": "openspec/changes/complete-fleet-and-combat/tasks.md",
+      "issue": "No explicit test for ship placement overlap detection beyond seeded property tests",
+      "impact": "Risk of undetected overlapping ships in rare configurations",
+      "recommendation": "Add deterministic overlap scenarios to the test suite and assert rejection."
+    },
+    {
+      "severity": "low",
+      "anchor": "openspec/changes/render-orthographic-battlefield/tasks.md",
+      "issue": "Quality tier selection criteria not documented",
+      "impact": "Inconsistent rendering quality across builds",
+      "recommendation": "Define and document the mapping between quality tiers and asset/feature flags."
+    },
+    {
+      "severity": "low",
+      "anchor": "openspec/changes/finish-match-experience/tasks.md",
+      "issue": "Chat rate window not quantified (e.g., messages per minute)",
+      "impact": "Potential abuse or denial of service via chat flooding",
+      "recommendation": "Specify a numeric rate limit and include a test that verifies enforcement."
+    }
+  ]
+}

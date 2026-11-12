@@ -1,0 +1,68 @@
+{
+  "gate": "spec",
+  "model": "gpt-oss:20b",
+  "reviewedAt": "2026-11-12T00:28:28.762614Z",
+  "inputs": [
+    {
+      "path": "openspec/changes/pair-and-recover-rooms/specs/matchmaking/spec.md",
+      "sha256": "b0b27a8e012a1cf38d3aab864b0bbff78aeb0806ed081245f24d6be1b8dc9e28"
+    },
+    {
+      "path": "openspec/changes/establish-authoritative-core/specs/server-authority/spec.md",
+      "sha256": "c87437f7e99a54b90198b02af74090bacac7d14b5c5283347d433deec88c97bc"
+    },
+    {
+      "path": "openspec/changes/complete-fleet-and-combat/specs/gameplay/spec.md",
+      "sha256": "b2efd779b59abded62abe50647380b88ccc7f0957aa19fbbfab915dbc85e8b1f"
+    },
+    {
+      "path": "openspec/changes/render-orthographic-battlefield/specs/visualization/spec.md",
+      "sha256": "780a95912f635c298f77a41820f1a5048c0de3351789187b8f75cd4d44867323"
+    },
+    {
+      "path": "openspec/changes/finish-match-experience/specs/room-experience/spec.md",
+      "sha256": "fbf785525c97cb7438ef52f31ee2add14fabae8dc274849fdec95d600571a56d"
+    },
+    {
+      "path": "openspec/changes/verify-and-demonstrate-sdd/specs/sdd-verification/spec.md",
+      "sha256": "d618cccb459ecf3d24c0ed6ccd7ba4448bab856295c36b2f79d9dd7b463ffda4"
+    }
+  ],
+  "findings": [
+    {
+      "severity": "critical",
+      "anchor": "openspec/changes/finish-match-experience/specs/room-experience/spec.md",
+      "issue": "Missing authority definition for chat persistence",
+      "impact": "Chat messages may be stored or transmitted without explicit authorization, violating privacy and data‑handling policies.",
+      "recommendation": "Add a requirement that the server authenticates the sender, validates the recipient is the paired participant, and stores messages in an encrypted, access‑controlled store. Include a retention policy and audit trail."
+    },
+    {
+      "severity": "high",
+      "anchor": "openspec/changes/complete-fleet-and-combat/specs/gameplay/spec.md",
+      "issue": "Fleet secrecy rule does not specify handling of partially revealed ships",
+      "impact": "If a ship is partially hit, the server may inadvertently expose the remaining geometry through the snapshot or notification, leaking strategic information.",
+      "recommendation": "Clarify that the server must mask all unhit cells of a ship until the ship is fully sunk, and that any snapshot or hint must not reveal the ship’s orientation or remaining cells."
+    },
+    {
+      "severity": "medium",
+      "anchor": "openspec/changes/verify-and-demonstrate-sdd/specs/sdd-verification/spec.md",
+      "issue": "Reproducible verification lacks explicit concurrency test coverage",
+      "impact": "Concurrent actions (e.g., simultaneous fire commands) could lead to race conditions or state corruption if not tested.",
+      "recommendation": "Add a concurrency test scenario that simulates two participants issuing commands at the same timestamp and verifies that the server serializes them deterministically and returns consistent outcomes."
+    },
+    {
+      "severity": "medium",
+      "anchor": "openspec/changes/render-orthographic-battlefield/specs/visualization/spec.md",
+      "issue": "Frame budget requirement references a single Mac reference build",
+      "impact": "Performance guarantees may not hold on other hardware or browsers, leading to inconsistent user experience.",
+      "recommendation": "Specify that the frame budget must be met on a representative set of devices (e.g., mid‑range laptop, high‑end desktop) and browsers (Chrome, Firefox, Safari). Include a fallback mechanism to reduce visual fidelity if thresholds are exceeded."
+    },
+    {
+      "severity": "low",
+      "anchor": "openspec/changes/establish-authoritative-core/specs/server-authority/spec.md",
+      "issue": "Command serialization rule does not address replay attacks across sessions",
+      "impact": "An attacker could replay old commands after a session reset, potentially altering game state.",
+      "recommendation": "Require that each command includes a session‑specific nonce or timestamp and that the server rejects commands with a nonce older than the current session’s start time."
+    }
+  ]
+}
